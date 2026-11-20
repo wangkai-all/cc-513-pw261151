@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>隐私保护聚合查询</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#query-panel">跳到查询</a>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">∑</span>
+        <div>
+          <h1>隐私保护聚合查询</h1>
+          <p class="subtitle">k-匿名阈值 · 差分隐私预算 · 重复查询限制 · 结果缓存</p>
+        </div>
+      </div>
+      <div class="identity">
+        <label for="caller-select">当前身份</label>
+        <select id="caller-select" aria-describedby="caller-hint"></select>
+        <span id="caller-hint" class="hint"></span>
+        <button id="refresh-btn" class="ghost" type="button">刷新权限</button>
+      </div>
+    </header>
+
+    <div class="banner" id="banner" role="status" hidden></div>
+
+    <main class="layout">
+      <section class="panel" id="query-panel" aria-labelledby="query-title">
+        <h2 id="query-title">查询条件</h2>
+        <form id="query-form">
+          <div class="field">
+            <label for="metric">指标</label>
+            <select id="metric" name="metric"></select>
+            <p class="hint" id="metric-hint"></p>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="groupBy">分组</label>
+              <select id="groupBy" name="groupBy"></select>
+            </div>
+            <div class="field">
+              <label for="note">备注（写入审计日志）</label>
+              <input id="note" name="note" maxlength="200" placeholder="例如：季度人力盘点" />
+            </div>
+          </div>
+
+          <fieldset class="filters">
+            <legend>筛选条件</legend>
+            <div class="grid-3" id="filter-fields"></div>
+            <p class="hint">留空表示不限。切换筛选条件后会重新进行阈值、差异性和预算校验。</p>
+          </fieldset>
+
+          <div class="actions">
+            <button type="submit" class="primary" id="run-btn">执行查询</button>
+            <button type="reset" class="ghost">重置条件</button>
+          </div>
+        </form>
+
+        <div class="policy-strip" id="policy-strip" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" id="result-panel" aria-labelledby="result-title">
+        <div class="panel-head">
+          <h2 id="result-title">查询结果</h2>
+          <span class="pill" id="status-pill">尚未查询</span>
+        </div>
+
+        <div id="result-empty" class="empty">
+          选择条件后点击「执行查询」。被拒绝的查询同样会展示原因，并且不会消耗预算。
+        </div>
+
+        <div id="result-body" hidden>
+          <div class="conditions" id="conditions"></div>
+
+          <div class="privacy-card" id="privacy-card">
+            <div class="privacy-head">
+              <span class="privacy-icon" id="privacy-icon" aria-hidden="true"></span>
+              <div>
+                <strong id="privacy-title"></strong>
+                <p id="privacy-message"></p>
+              </div>
+            </div>
+            <dl class="privacy-facts" id="privacy-facts"></dl>
+          </div>
+
+          <div class="data-block" id="data-block" hidden>
+            <table class="results" id="results-table">
+              <caption id="results-caption"></caption>
+              <thead>
+                <tr>
+                  <th scope="col" id="group-header">分组</th>
+                  <th scope="col">数值</th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+            <p class="hint" id="noise-note"></p>
+          </div>
+
+          <div class="audit-foot" id="audit-foot"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="budget-panel" aria-labelledby="budget-title">
+        <h2 id="budget-title">隐私预算</h2>
+        <div class="meter" role="img" id="budget-meter" aria-label="预算使用情况">
+          <div class="meter-fill" id="budget-fill"></div>
+        </div>
+        <dl class="stat-list" id="budget-stats"></dl>
+        <p class="hint">
+          每次发布消耗 ε；命中缓存或幂等重放不消耗预算。预算耗尽后只能查看已发布（缓存内）的结果。
+        </p>
+      </section>
+
+      <section class="panel" id="history-panel" aria-labelledby="history-title">
+        <div class="panel-head">
+          <h2 id="history-title">我的查询记录</h2>
+          <button class="ghost small" id="history-refresh" type="button">刷新</button>
+        </div>
+        <div class="table-scroll">
+          <table class="compact" id="history-table">
+            <thead>
+              <tr>
+                <th scope="col">时间</th>
+                <th scope="col">结果</th>
+                <th scope="col">ε</th>
+                <th scope="col">请求编号</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint" id="history-empty">暂无记录。</p>
+      </section>
+
+      <details class="panel admin" id="admin-panel">
+        <summary>
+          <h2>运维审计（管理员）</h2>
+          <span class="hint">策略、审计链、预算台账与权限管理</span>
+        </summary>
+        <div id="admin-body">
+          <div class="actions">
+            <button class="ghost small" data-admin="overview" type="button">刷新概览</button>
+            <button class="ghost small" data-admin="verify" type="button">校验审计链</button>
+            <button class="ghost small" data-admin="audit" type="button">审计日志</button>
+            <button class="ghost small" data-admin="purge" type="button">清空结果缓存</button>
+          </div>
+          <p class="hint" id="admin-status" role="status"></p>
+
+          <div class="grid-2 admin-grid">
+            <div>
+              <h3>隐私策略</h3>
+              <form id="policy-form" class="stack">
+                <div class="field">
+                  <label for="policy-k">最小群体阈值 k</label>
+                  <input id="policy-k" type="number" min="2" max="100" step="1" />
+                </div>
+                <div class="field">
+                  <label for="policy-eps">单次发布 ε</label>
+                  <input id="policy-eps" type="number" min="0.05" max="5" step="0.05" />
+                </div>
+                <div class="field">
+                  <label for="policy-cap">人均 ε 上限</label>
+                  <input id="policy-cap" type="number" min="0.1" max="100" step="0.1" />
+                </div>
+                <div class="field">
+                  <label for="policy-repeat">重复查询次数上限</label>
+                  <input id="policy-repeat" type="number" min="1" max="100" step="1" />
+                </div>
+                <div class="field">
+                  <label for="policy-ttl">缓存有效期（分钟）</label>
+                  <input id="policy-ttl" type="number" min="0" max="1440" step="1" />
+                </div>
+                <label class="check">
+                  <input id="policy-comp" type="checkbox" />
+                  开启互补抑制（存在小分组时拒绝整次查询）
+                </label>
+                <label class="check">
+                  <input id="policy-diff" type="checkbox" />
+                  开启差异性防护
+                </label>
+                <label class="check">
+                  <input id="policy-cohort" type="checkbox" />
+                  向用户展示精确人数（默认关闭）
+                </label>
+                <button type="submit" class="primary small">保存策略（会自动失效缓存）</button>
+              </form>
+            </div>
+
+            <div>
+              <h3>调用方</h3>
+              <div class="table-scroll">
+                <table class="compact" id="admin-callers">
+                  <thead>
+                    <tr>
+                      <th scope="col">身份</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">ε 已用</th>
+                      <th scope="col">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <h3>审计链</h3>
+              <div id="admin-audit-chain" class="chain-status"></div>
+              <p class="hint" id="admin-cache-stats"></p>
+              <div class="table-scroll">
+                <table class="compact" id="admin-audit">
+                  <thead>
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">时间</th>
+                      <th scope="col">动作</th>
+                      <th scope="col">结果</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <h3>预算台账</h3>
+              <div class="table-scroll">
+                <table class="compact" id="admin-ledger">
+                  <thead>
+                    <tr>
+                      <th scope="col">调用方</th>
+                      <th scope="col">ε</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">结果码</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <footer class="footer">
+      <p>
+        演示数据为程序生成，不含真实个人。服务端仅使用 Node.js 标准库
+        （<code>node:http</code>、<code>node:sqlite</code>、<code>node:crypto</code>）。
+      </p>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

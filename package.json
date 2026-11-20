@@ -1,0 +1,17 @@
+{
+  "name": "privacy-aggregate-query",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Privacy-preserving aggregate query service with k-anonymity threshold, per-caller budget, repeat-query limits, caching, and an audit trail.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "test:watch": "node --test --watch \"test/*.test.js\"",
+    "demo": "node scripts/demo.js"
+  }
+}
